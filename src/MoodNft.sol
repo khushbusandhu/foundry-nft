@@ -1,68 +1,65 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity ^0.8.18;
+pragma solidity 0.8.19;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
-import {console} from "forge-std/console.sol";
 
-contract MoodNft is ERC721 {
-    //Errors
+contract MoodNft is ERC721, Ownable {
+    error ERC721Metadata__URI_QueryFor_NonExistentToken();
     error MoodNft__CantFlipMoodIfNotOwner();
 
-    uint256 private s_tokenCounter;
-    string private s_sadSvgImageUri;
-    string private s_happySvgImageUri;
-
-    enum Mood
-    //the moods
-    {
+    enum NFTState {
         HAPPY,
         SAD
     }
 
-    mapping(uint256 => Mood) private s_tokenIdToMood;
+    uint256 private s_tokenCounter;
+    string private s_sadSvgUri;
+    string private s_happySvgUri;
 
-    constructor(string memory sadSvgImageUri, string memory happySvgImageUri) ERC721("Mood NFT", "MT") {
+    mapping(uint256 => NFTState) private s_tokenIdToState;
+
+    event CreatedNFT(uint256 indexed tokenId);
+
+    constructor(string memory sadSvgUri, string memory happySvgUri) ERC721("Mood NFT", "MN") {
         s_tokenCounter = 0;
-        s_happySvgImageUri = happySvgImageUri;
-        s_sadSvgImageUri = sadSvgImageUri;
+        s_sadSvgUri = sadSvgUri;
+        s_happySvgUri = happySvgUri;
     }
 
     function mintNft() public {
+        // how would you require payment for this NFT?
         _safeMint(msg.sender, s_tokenCounter);
-        s_tokenIdToMood[s_tokenCounter] = Mood.HAPPY; //default the mood to being happy
-        s_tokenCounter++;
+        s_tokenCounter = s_tokenCounter + 1;
+        emit CreatedNFT(s_tokenCounter);
     }
 
     function flipMood(uint256 tokenId) public {
-        //We only the want the NFT owner to be able to change mood.
         if (!_isApprovedOrOwner(msg.sender, tokenId)) {
             revert MoodNft__CantFlipMoodIfNotOwner();
         }
 
-        if (s_tokenIdToMood[tokenId] == Mood.HAPPY) {
-            s_tokenIdToMood[tokenId] = Mood.SAD;
+        if (s_tokenIdToState[tokenId] == NFTState.HAPPY) {
+            s_tokenIdToState[tokenId] = NFTState.SAD;
+        } else {
+            s_tokenIdToState[tokenId] = NFTState.HAPPY;
         }
-        if (s_tokenIdToMood[tokenId] == Mood.SAD) {
-            s_tokenIdToMood[tokenId] = Mood.HAPPY;
-        }
-        console.log("After FlipMood:", tokenURI(tokenId));
     }
 
     function _baseURI() internal pure override returns (string memory) {
-        return "data:application/json;base64,"; // before it was in the end: based64 ❌
+        return "data:application/json;base64,";
     }
 
-    function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        string memory imageURI;
-        if (s_tokenIdToMood[tokenId] == Mood.HAPPY) {
-            imageURI = s_sadSvgImageUri; //assign happySvg
+    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
+        if (!_exists(tokenId)) {
+            revert ERC721Metadata__URI_QueryFor_NonExistentToken();
         }
-        if (s_tokenIdToMood[tokenId] == Mood.SAD) {
-            imageURI = s_happySvgImageUri; //assign sad
-        }
+        string memory imageURI = s_happySvgUri;
 
+        if (s_tokenIdToState[tokenId] == NFTState.SAD) {
+            imageURI = s_sadSvgUri;
+        }
         return string(
             abi.encodePacked(
                 _baseURI(),
