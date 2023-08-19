@@ -51,7 +51,7 @@ contract MoodNft is ERC721 {
     }
 
     function _baseURI() internal pure override returns (string memory) {
-        return "data:application/json;base64,";
+        return "data:application/json;base64,"; // before it was in the end: based64 ❌
     }
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
